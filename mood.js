@@ -4,16 +4,15 @@ const bing_api_key = BING_API_KEY
 function runSearch() {
 
   // TODO: Clear the results pane before you run a new search
-  document.querySelector("#results").innerHTML = "";
+  document.getElementById("resultsImageContainer").innerHTML = "";
 
-  const searchTerm = document.querySelector(".search input").value;
-  if (!searchTerm) return false;
 
   openResultsPane();
 
   // TODO: Build your query by combining the bing_api_endpoint and a query attribute
   //  named 'q' that takes the value from the search bar input field.
-  const queryUrl = `${bing_api_endpoint}?q=${encodeURIComponent(searchTerm)}`;
+  const query = document.querySelector(".search input").value;
+  const queryUrl = `${bing_api_endpoint}?q=${encodeURIComponent(query)}`;
 
 
   let request = new XMLHttpRequest();
@@ -33,19 +32,29 @@ function runSearch() {
   // request.setRequestHeader("Ocp-Apim-Subscription-Key", bing_api_key);
 
   // TODO: Send the request
-  request.open('GET', queryUrl, true);
+  request.open('GET', queryUrl);
   request.responseType = 'json';
   request.setRequestHeader("Ocp-Apim-Subscription-Key", bing_api_key);
 
-  request.addEventListener('load', function(event) {
-    if (request.status >= 200 && request.status < 300) {
-      const response = event.target.response;
-      displayImageResults(response.value); // Function to display images
-      displayRelatedConcepts(response.queryExpansions); // Function to display related concepts
-    } else {
-      console.warn(request.statusText, request.responseText);
+  request.onload = function() {
+    if(request.status === 200) {
+      console.log(request.response)
+      displayImageResults(request.response);
+      displayRelatedConcepts(request.response);
+    }else {
+      console.error("Search Failed: ", request.statusText);
     }
-  });
+  }
+  
+  //request.addEventListener('load', function(event) {
+  //  if (request.status >= 200 && request.status < 300) {
+  //    const response = event.target.response;
+  //    displayImageResults(response.value); 
+  //    displayRelatedConcepts(response.queryExpansions); 
+  //  } else {
+  //    console.warn(request.statusText, request.responseText);
+  //  }
+  //});
 
   request.send();
 
@@ -55,45 +64,76 @@ function runSearch() {
                   // the default form submission behavior.
 }
 
-function displayRelatedConcepts(concepts) {
-  const resultsContainer = document.querySelector("#results");
+//function displayRelatedConcepts(concepts) {
+//  const resultsContainer = document.querySelector("#results");
   
   // Clear any existing related search concepts
-  resultsContainer.innerHTML = "";
+//  resultsContainer.innerHTML = "";
 
-  concepts.forEach((concept) => {
-    const button = document.createElement('button');
-    button.textContent = concept.displayText;
-    button.onclick = function() {
-      document.querySelector("#searchbar").value = concept.displayText;
-      runSearch(); // Re-run search with the new concept
+//  concepts.forEach((concept) => {
+//    const button = document.createElement('button');
+//    button.textContent = concept.displayText;
+//    button.onclick = function() {
+//      document.querySelector("#searchbar").value = concept.displayText;
+//      runSearch(); // Re-run search with the new concept
+//    };
+//    resultsContainer.appendChild(button);
+//  });
+//}
+
+function displayRelatedConcepts(response) {
+  const suggestions = document.querySelector(".suggestions ul");
+  suggestions.innerHTML = "";
+
+  const maxRelatedSuggestions = 10;
+  const searchSuggestions = response.relatedSearches?.slice(0, maxRelatedSuggestions) || [];
+
+  searchSuggestions.forEach(item => {
+    const listItem = document.createElement("li");
+    listItem.textContent = item.text;
+    listItem.onclick = () => {
+      document.querySelector(".search input").value = item.text;
+      runSearch();
     };
-    resultsContainer.appendChild(button);
+    suggestions.appendChild(listItem);
   });
 }
 
-function displayImageResults(images) {
-  const resultsImageContainer = document.querySelector("#results");
+//function displayImageResults(images) {
+//  const resultsImageContainer = document.querySelector("#results");
+//
+  /// Clear previous images if any
+  //resultsImageContainer.innerHTML = "";
 
-  // Clear previous images if any
-  resultsImageContainer.innerHTML = "";
-
-  images.forEach((image) => {
-    const img = document.createElement('img');
-    img.src = image.thumbnailUrl;
-    img.alt = image.name;
-    img.onclick = function() {
-      addToMoodBoard(image.contentUrl); // Function to add image to mood board
-    };
-    resultsImageContainer.appendChild(img);
+//  images.forEach((image) => {
+//    const img = document.createElement('img');
+//    img.src = image.thumbnailUrl;
+//    img.alt = image.name;
+//    img.onclick = function() {
+ //     addToMoodBoard(image.contentUrl); // Function to add image to mood board
+  //  };
+    //resultsImageContainer.appendChild(img);
+  //});
+//}
+function displayImageResults(response) {
+  const resultsContainer = document.getElementById("resultsImageContainer");
+  response.value.forEach(item => {
+    const imageElement = document.createElement("img");
+    imageElement.src = item.thumbnailUrl;
+    imageElement.onclick = () => addToMoodBoard(imageElement);
+    resultsContainer.appendChild(imageElement);
   });
 }
 
-function addToMoodBoard(imageUrl) {
-  const moodBoardContainer = document.querySelector("#board");
-  const img = document.createElement('img');
-  img.src = imageUrl;
-  moodBoardContainer.appendChild(img);
+function addToMoodBoard(img) {
+  const board = document.getElementById("board");
+  const imageElement = img.cloneNode();
+  board.appendChild(imageElement);
+}
+
+function runInitialSuggestionsSearch(query) {
+  document.querySelector(".search input").value = query;
+  runSearch();
 }
 
 function openResultsPane() {
@@ -117,24 +157,3 @@ document.querySelector("body").addEventListener("keydown", (e) => {
   if(e.key == "Escape") {closeResultsPane()}
 });
 
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelector("#runSearchButton").addEventListener("click", function(event) {
-    event.preventDefault(); // Prevent the default form submission
-    runSearch();
-  });
-
-  document.querySelector(".search input").addEventListener("keypress", function(event) {
-    if (event.key === "Enter") {
-      event.preventDefault(); // Prevent the default form submission
-      runSearch();
-    }
-  });
-
-  document.querySelector("#closeResultsButton").addEventListener("click", closeResultsPane);
-
-  document.querySelector("body").addEventListener("keydown", function(event) {
-    if (event.key === "Escape") {
-      closeResultsPane();
-    }
-  });
-});
